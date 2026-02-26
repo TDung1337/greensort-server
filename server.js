@@ -1,13 +1,22 @@
 import express from "express";
-import cors from "cors"; // Cài thêm: npm install cors
 import fetch from "node-fetch";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY;
 
-// Sử dụng package CORS chuẩn thay vì set header thủ công
-app.use(cors());
+/* ===== CORS FIX (Cách thủ công cũ của bạn) ===== */
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json({ limit: "10mb" }));
 
 /* ===== TEST ROUTE ===== */
@@ -19,7 +28,6 @@ app.get("/", (req, res) => {
 });
 
 /* ===== PROMPT BUILDER ===== */
-// Tạo prompt động dựa theo ngôn ngữ Client gửi lên
 const buildPrompt = (lang) => {
   const isVi = lang === 'vi';
   const categories = isVi 
@@ -95,7 +103,7 @@ app.post("/analyze", async (req, res) => {
       throw new Error("Empty response from AI");
     }
 
-    // Phân tích JSON (Rất an toàn vì đã ép responseMimeType)
+    // Phân tích JSON
     const jsonResult = JSON.parse(textResponse);
     
     // Gửi kết quả về Frontend

@@ -5,7 +5,7 @@ const app = express();
 
 app.use(express.json({limit:"10mb"}));
 
-const API_KEY="AIzaSyBbSVGZDJYvc_aYULXuE-iSrFda72LnGXU";
+const API_KEY = process.env.API_KEY;
 
 app.post("/analyze",async(req,res)=>{
 

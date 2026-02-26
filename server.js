@@ -22,7 +22,29 @@ body:JSON.stringify({
 contents:[{
 parts:[
 {
-text:"Phân loại rác và trả JSON gồm object và category"
+text:`
+Phân tích ảnh rác và trả về JSON.
+
+Quy tắc:
+
+- Nhận diện vật thể chính xác.
+- Giấy, khăn giấy, giấy vo → thường là rác tái chế hoặc rác thường.
+- Chỉ phân loại "Chất thải nguy hại" nếu thấy rõ pin hoặc thiết bị điện tử.
+- Không đoán điện thoại nếu không chắc chắn.
+- Giấy vo KHÔNG phải điện thoại.
+
+Trả về JSON duy nhất:
+
+{
+ "object":"tên vật thể",
+ "material":"chất liệu",
+ "category":"Chất thải hữu cơ | Chất thải tái chế | Chất thải nguy hại | Chất thải khó phân hủy | Không phải rác",
+ "instruction":"cách xử lý ngắn",
+ "tip":"mẹo",
+ "confidence":0-100
+}
+
+Không viết thêm gì ngoài JSON.
 },
 {
 inlineData:{

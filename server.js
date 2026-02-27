@@ -1,22 +1,12 @@
 import express from "express";
+import cors from "cors";
 import fetch from "node-fetch";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY;
 
-/* ===== CORS FIX (Cách thủ công cũ của bạn) ===== */
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
+app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
 /* ===== TEST ROUTE ===== */
@@ -63,9 +53,9 @@ app.post("/analyze", async (req, res) => {
       throw new Error("API_KEY is not configured on the server.");
     }
 
-    // Gọi Gemini API
+    // ĐÃ SỬA: Đổi model thành gemini-1.5-flash-latest
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -83,7 +73,6 @@ app.post("/analyze", async (req, res) => {
               }
             ]
           }],
-          // Tính năng mạnh mẽ: Ép Gemini API chỉ trả về chuỗi JSON hợp lệ
           generationConfig: {
             responseMimeType: "application/json"
           }
@@ -106,13 +95,11 @@ app.post("/analyze", async (req, res) => {
     // Phân tích JSON
     const jsonResult = JSON.parse(textResponse);
     
-    // Gửi kết quả về Frontend
     res.json(jsonResult);
 
   } catch (err) {
     console.error("❌ AI ERROR:", err.message);
 
-    // Fallback: Nếu lỗi, trả về dữ liệu mặc định đúng theo ngôn ngữ
     const isVi = req.body.lang === 'vi';
     res.json({
       object: isVi ? "Không xác định" : "Unknown object",

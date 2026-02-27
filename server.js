@@ -7,13 +7,14 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY;
 
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "15mb" })); // Tăng nhẹ limit để tránh lỗi ảnh lớn
 
 /* ===== TEST ROUTE ===== */
 app.get("/", (req, res) => {
   res.json({ 
     status: "online", 
-    message: "GreenSort AI Server is running 🌱" 
+    message: "GreenSort AI Server is running 🌱",
+    author: "Đức Toàn"
   });
 });
 
@@ -24,9 +25,7 @@ const buildPrompt = (lang) => {
     ? '"Chất thải hữu cơ", "Chất thải tái chế", "Chất thải nguy hại", "Chất thải khó phân hủy", "Không phải rác"'
     : '"Organic Waste", "Recyclable Waste", "Hazardous Waste", "General Waste", "Not Waste"';
 
-  return `
-Analyze this image and return ONLY a valid JSON object.
-Do NOT use markdown code blocks (like \`\`\`json).
+  return `Analyze this image and return ONLY a valid JSON object.
 The response language MUST BE in ${isVi ? 'Vietnamese' : 'English'}.
 
 Required JSON Structure:
@@ -36,7 +35,7 @@ Required JSON Structure:
  "category": "MUST BE EXACTLY ONE OF THESE: ${categories}",
  "instruction": "Short, clear disposal instruction",
  "tip": "Short environmental tip related to this item",
- "confidence": <integer between 70 and 99 representing your confidence>
+ "confidence": <integer between 70 and 99>
 }`;
 };
 
@@ -50,69 +49,69 @@ app.post("/analyze", async (req, res) => {
     }
 
     if (!API_KEY) {
-      throw new Error("API_KEY is not configured on the server.");
+      console.error("❌ MISSING API_KEY: Hãy kiểm tra Environment Variables trên Render.");
+      return res.status(500).json({ error: "Server configuration error" });
     }
 
-    // ĐÃ SỬA: Đổi model thành gemini-1.5-flash-latest
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: buildPrompt(lang) },
-              {
-                inlineData: {
-                  mimeType: mime || "image/jpeg",
-                  data: image
-                }
+    // SỬA ĐỔI QUAN TRỌNG: Sử dụng API v1 và model gemini-1.5-flash để ổn định nhất
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: buildPrompt(lang) },
+            {
+              inlineData: {
+                mimeType: mime || "image/jpeg",
+                data: image
               }
-            ]
-          }],
-          generationConfig: {
-            responseMimeType: "application/json"
-          }
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
-    }
+            }
+          ]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.4 // Giảm temperature để kết quả phân loại rác chính xác hơn
+        }
+      })
+    });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Gemini API Error Details:", JSON.stringify(data));
+      throw new Error(`Gemini Error ${response.status}: ${data.error?.message || "Unknown error"}`);
+    }
+
     const textResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!textResponse) {
-      throw new Error("Empty response from AI");
+      throw new Error("AI returned empty content");
     }
 
-    // Phân tích JSON
-    const jsonResult = JSON.parse(textResponse);
-    
-    res.json(jsonResult);
+    // Trả về trực tiếp JSON từ AI
+    res.json(JSON.parse(textResponse));
 
   } catch (err) {
-    console.error("❌ AI ERROR:", err.message);
+    console.error("❌ SERVER ERROR:", err.message);
 
     const isVi = req.body.lang === 'vi';
-    res.json({
-      object: isVi ? "Không xác định" : "Unknown object",
-      material: isVi ? "Không rõ" : "Unknown",
+    res.status(500).json({
+      object: isVi ? "Lỗi phân tích" : "Analysis Error",
+      material: isVi ? "Không xác định" : "Unknown",
       category: isVi ? "Chất thải khó phân hủy" : "General Waste",
-      instruction: isVi ? "Bỏ vào thùng rác thông thường." : "Dispose in general waste bin.",
-      tip: isVi ? "Hệ thống AI đang quá tải hoặc gặp lỗi." : "AI system overloaded or error.",
-      confidence: 50
+      instruction: isVi ? "Vui lòng thử lại sau giây lát." : "Please try again later.",
+      tip: "Error: " + err.message,
+      confidence: 0
     });
   }
 });
 
 /* ===== START SERVER ===== */
 app.listen(PORT, () => {
-  console.log(`🌱 GreenSort server running on port ${PORT}`);
+  console.log(`\n🚀 GreenSort Server Live!`);
+  console.log(`📍 Port: ${PORT}`);
+  console.log(`🔗 Endpoint: http://localhost:${PORT}/analyze\n`);
 });
